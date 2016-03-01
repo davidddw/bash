@@ -18,4 +18,6 @@ fi
 
 sshpass -p $pass \
     ssh-copy-id -i ~/.ssh/id_rsa.pub $host > /dev/null 2>&1
-    
+
+echo Done
+exit 0
