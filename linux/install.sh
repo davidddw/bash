@@ -26,9 +26,10 @@ lcazureps="$lcsys/azure_publishsettings"
 LC_BIN_DIR="/usr/local/livecloud/bin"
 
 domain_name=2cloud.com
-public_ip_address=10.33.2.207
+public_ip_address_bss=10.33.37.51
+public_ip_address_oss=10.33.37.52
 controller_control_interface=eth0
-controller_control_ip=172.16.2.207
+controller_control_ip=172.16.37.51
 
 
 # **********************************
@@ -452,19 +453,7 @@ install_webpages () {
     openssl req -new -batch -key server.pem -out server.csr &>> $INSTALL_LOG
     openssl x509 -req -days 365 -in server.csr -signkey server.pem -out server.crt &>> $INSTALL_LOG
     cd $tmpdir
-    echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
     
-    echo -n "Configuring lcweb_bss ... "
-    rm -rf $lcweb_bss > /dev/null 2>&1
-    mkdir -p $lcweb_bss > /dev/null
-    cp -rf $1/lcweb_bss /var/www > /dev/null
-    mkdir -p $lcweb_bss/public/plugin > /dev/null
-    cp -rf $1/3parties/noVNC $lcweb_bss/public/plugin > /dev/null
-    mkdir -p /var/lib/php/bsssession > /dev/null
-    chmod 770 /var/lib/php/bsssession
-    chgrp apache /var/lib/php/bsssession
-    sed -i "/^session.save_path = \"\/var\/lib\/php\/session\"/d" /etc/php.ini
-
     conf="/etc/httpd/conf/httpd.conf"
     check=`grep -o "^Timeout 6000$" $conf`
     if [ -z "$check" ]; then
@@ -497,7 +486,22 @@ install_webpages () {
         sed -i "/^AddType application\/x-gzip .gz .tgz$\
 /a\\" $conf > /dev/null
     fi
-
+    
+    cat << EOF > /etc/httpd/conf.d/ssl-oss.conf 
+Listen 127.0.0.1:8080
+<VirtualHost 127.0.0.1:8080>
+    ServerName oss.dev4-2.com
+    DocumentRoot /var/www/lcweb
+    ErrorLog logs/oss_error.log
+    CustomLog logs/oss_access_log common
+    <Directory /var/www/lcweb>
+        Options Indexes FollowSymLinks Multiviews
+        AllowOverride All
+        Order allow,deny
+        Allow from all
+    </Directory>
+</VirtualHost>
+EOF
     chmod 777 /var/www/lcweb/public/pdf/*
     chmod 777 /var/www/lcweb/public/images/tree/tree.png
     mkdir -p '/var/www/lcweb/public/report/'
@@ -509,7 +513,32 @@ install_webpages () {
     chmod 777 /var/www/lcweb/public/images/upload/
     mkdir -p /var/www/lcweb_cache
     chmod 777 /var/www/lcweb_cache
+    echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
 
+    echo -n "Configuring lcweb_bss ... "
+    rm -rf $lcweb_bss > /dev/null 2>&1
+    mkdir -p $lcweb_bss > /dev/null
+    cp -rf $1/lcweb_bss /var/www > /dev/null
+    mkdir -p $lcweb_bss/public/plugin > /dev/null
+    cp -rf $1/3parties/noVNC $lcweb_bss/public/plugin > /dev/null
+    mkdir -p /var/lib/php/bsssession > /dev/null
+    chmod 770 /var/lib/php/bsssession
+    chgrp apache /var/lib/php/bsssession
+    sed -i "/^session.save_path = \"\/var\/lib\/php\/session\"/d" /etc/php.ini
+    cat << EOF > /etc/httpd/conf.d/ssl-bss.conf 
+<VirtualHost 127.0.0.1:80>
+    ServerName bss.dev4-2.com
+    DocumentRoot /var/www/lcweb_bss
+    ErrorLog logs/bss_error.log
+    CustomLog logs/bss_access_log common
+    <Directory /var/www/lcweb_bss>
+        Options Indexes FollowSymLinks Multiviews
+        AllowOverride All
+        Order allow,deny
+        Allow from all
+    </Directory>
+</VirtualHost>
+EOF
     chmod 777 /var/www/lcweb_bss/public/pdf/*
     mkdir -p '/var/www/lcweb_bss/public/report/'
     chmod 777 /var/www/lcweb_bss/public/report
@@ -520,28 +549,25 @@ install_webpages () {
     chmod 777 /var/www/lcweb_bss/public/images/upload/
     mkdir -p /var/www/lcweb_cache
     chmod 777 /var/www/lcweb_cache
-
     echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
-    echo -n "Configuring http ... "
 
+    echo -n "Configuring http ... "
     if [ -f /etc/httpd/nginx.conf ]; then
         mv -f /etc/httpd/nginx.conf /etc/httpd/nginx.conf.bak
     fi
     if [ -f /etc/httpd/conf.d/ssl.conf ]; then
         mv -f /etc/httpd/conf.d/ssl.conf /etc/httpd/conf.d/ssl.conf.bak
     fi
-
     rm -f /etc/nginx/conf.d/*
-    cp /var/www/lcweb/lcwebinit/nginx/ssl.conf /etc/nginx/conf.d/
+    cp /var/www/lcweb/lcwebinit/nginx/ssl.conf /etc/nginx/conf.d/ssl-oss.conf
     cp /var/www/lcweb/lcwebinit/nginx/nginx.conf /etc/nginx/
-    cp /var/www/lcweb_bss/lcwebinit/nginx/ssl.conf /etc/nginx/conf.d/
-	echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
+    cp /var/www/lcweb_bss/lcwebinit/nginx/ssl.conf /etc/nginx/conf.d/ssl-bss.conf
+    echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
 
     echo -n "Configuring lcweb report schedule ... "
     sed -i "/buildreportform/d" /etc/crontab
     echo '10 0 * * 1 root curl "http://127.0.0.1/report/buildreportform?type=weekly" > /dev/null 2>&1' >>/etc/crontab
     echo '30 0 1 * * root curl "http://127.0.0.1/report/buildreportform?type=monthly" > /dev/null 2>&1' >>/etc/crontab
-
 	systemctl enable httpd &>> $INSTALL_LOG
 	systemctl restart httpd &>> $INSTALL_LOG
     if [[ $? -eq 0 ]]; then
@@ -595,11 +621,6 @@ install_programs () {
     fi
 
 	echo -n "Install lc_program ..."
-    cp -rf -d $1/cobbler_install                      $lcsys > /dev/null
-    cp -rf $1/packages/rsyslog                        $lcforxen > /dev/null
-    cp -rf $1/packages/rsyslog                        $lcforkvm > /dev/null
-    cp -rf $1/packages/xen/*                          $lcforxen > /dev/null
-    cp -rf $1/packages/nsp/*                          $lcfornsp > /dev/null
     if [ -e $1/lc_program/ovs-xs1.6.10.tar.gz ]; then
         cp -rf $1/lc_program/ovs-xs1.6.10.tar.gz      $lcforxen > /dev/null
     fi
@@ -801,7 +822,7 @@ __sys_install () {
     path="`pwd`/lc_release"
     if [ -d $path ]; then
         if [ -d $path/lc_program ] && [ -d $path/lcweb ] && [ -d $path/state_sniffer ] && [ -d $path/lcwebapi ] \
-        && [ -d $path/3parties ] && [ -d $path/packages ]; then
+        && [ -d $path/3parties ] ; then
             #install_packages $path
 
             install_webpages $path
@@ -836,9 +857,11 @@ config_stats_server () {
     controller_control_ip=$2
 
     echo -n "Configuring InfluxDB ... "
+    rm -rf /etc/influxdb/influxdb.conf &&
     \cp -rf $lc_release_path/lc_program/script/conf/stats/influxdb.conf /etc/influxdb/ > /dev/null
     sed -i "s/__CONTROLLER_CONTROL_IP__/$controller_control_ip/g" /etc/influxdb/influxdb.conf
-    systemctl start influxdb & >> $INSTALL_LOG
+    systemctl enable influxdb & >> $INSTALL_LOG
+    systemctl restart influxdb & >> $INSTALL_LOG
     if [[ $? -eq 0 ]]; then
         echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
     else
@@ -846,7 +869,7 @@ config_stats_server () {
     fi
 
     echo -n "Configuring telegraf ... "
-    mkdir -p /etc/opt/telegraf/ && 
+    rm -rf /etc/telegraf/telegraf.conf &&
     \cp -rf $lc_release_path/lc_program/script/conf/stats/telegraf.conf /etc/telegraf/ > /dev/null
     sed -i "s/__CONTROLLER_CONTROL_IP__/$controller_control_ip/g" /etc/telegraf/telegraf.conf
     for ((it = 1; it <= 6; it += 1)); do
@@ -871,6 +894,7 @@ config_stats_server () {
     fi
 
     echo -n "Configuring Elasticsearch ... "
+    rm -rf /etc/elasticsearch/elasticsearch.yml > /dev/null  &&
     \cp -rf $lc_release_path/lc_program/script/conf/stats/elasticsearch.yml /etc/elasticsearch/ > /dev/null
     sed -i "s/__CONTROLLER_CONTROL_IP__/$controller_control_ip/g" /etc/elasticsearch/elasticsearch.yml
     systemctl enable elasticsearch &>> $INSTALL_LOG
@@ -887,6 +911,7 @@ config_stats_server () {
     echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
 
     echo -n "Configuring Kibana ... "
+    rm -rf /opt/kibana/config/kibana.yml > /dev/null && 
     \cp -rf $lc_release_path/lc_program/script/conf/stats/kibana.yml /opt/kibana/config/ > /dev/null
     sed -i "s/__CONTROLLER_CONTROL_IP__/$controller_control_ip/g" /opt/kibana/config/kibana.yml
     sh $lc_release_path/lc_program/script/conf/stats/kibana_init.sh $controller_control_ip &>> $INSTALL_LOG
@@ -899,6 +924,7 @@ config_stats_server () {
     fi
 
     echo -n "Configuring Grafana ... "
+    rm -rf /etc/grafana/grafana.ini > /dev/null && 
     \cp -rf $lc_release_path/lc_program/script/conf/stats/grafana.ini /etc/grafana/ > /dev/null
     mysql -e "GRANT ALL PRIVILEGES ON grafana.* TO 'grafana'@'localhost' IDENTIFIED BY 'grafana' WITH GRANT OPTION;" > /dev/null
     mysql -e "SOURCE $lc_release_path/lc_program/script/conf/stats/grafana.sql;" > /dev/null
@@ -918,6 +944,7 @@ config_stats_server () {
     sed -i "/logpath=/c logpath=\/var\/log\/mongo\/mongod.log" /etc/mongod.conf
     mkdir -p /var/log/mongo/
     chown mongodb:mongodb /var/log/mongo/
+    systemctl enable mongod &>> $INSTALL_LOG
     systemctl restart mongod &>> $INSTALL_LOG
     if [[ $? -eq 0 ]]; then
         check=`grep logpath /etc/mongod.conf`
@@ -932,7 +959,12 @@ config_stats_server () {
 
     echo -n "Restoring mongo corpus table (ip_info_v2_2) ... "
     cd $lc_release_path/packages/corpus/ip_info/
-    ./dboperation.sh restore
+    ./dboperation.sh restore &>> $INSTALL_LOG
+    if [[ $? -eq 0 ]]; then
+        echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
+    else
+        echo -e '\033[60G[\033[0;31mFAILED\033[0m]'
+    fi
     cd -
 }
 
@@ -991,13 +1023,8 @@ config_mysql_config_file () {
     systemctl stop mariadb 2>&1 > /dev/null
     killall mysqld 2> /dev/null
     sleep 8
-    if [[ $? -eq 0 ]]; then
-        echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
-    else
-        echo -e '\033[60G[\033[0;31mFAILED\033[0m]'
-    fi
 
-    echo -n "To remove blackhole datadir..."
+    # To remove blackhole datadir...
     rm -rf $datadir_blackhole
 
     # Copy the configuration file to main controller
@@ -1078,6 +1105,8 @@ init_system () {
     fi
 
     echo -n "Configuring iptables ... "
+    systemctl enable firewalld &>> $INSTALL_LOG
+    systemctl restart firewalld &>> $INSTALL_LOG
     firewall-cmd --permanent --zone=public --add-port=25000-33000/tcp &>> $INSTALL_LOG
 	firewall-cmd --permanent --zone=public --add-port=22/tcp &>> $INSTALL_LOG
 	firewall-cmd --permanent --zone=public --add-port=80/tcp &>> $INSTALL_LOG
@@ -1138,6 +1167,7 @@ restrict $nw_addr mask $netmask nomodify notrap
 server   127.127.1.0    # local clock
 fudge    127.127.1.0 stratum 10
 string
+    systemctl enable ntpd &>> $INSTALL_LOG
 	systemctl restart ntpd &>> $INSTALL_LOG
     if [[ "$?" -eq 0 ]]; then
         echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
@@ -1151,12 +1181,11 @@ string
         mkdir -p /var/run/mariadb
         chown mariadb:mariadb /var/run/mariadb
     fi
-    if [[ "$?" -eq 0 ]]; then
-        echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
-    else
-        echo -e '\033[60G[\033[0;31mFAILED\033[0m]'
-    fi
-    echo -n "To generate the configuration file of mysql."
+    systemctl enable mariadb &>> $INSTALL_LOG
+    systemctl restart mariadb &>> $INSTALL_LOG
+    mysql -e \
+        "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY 'security421' WITH GRANT OPTION;" > /dev/null
+    echo "To generate the configuration file of mysql." >> $INSTALL_LOG
     config_mysql_config_file
 
     check=`ls ~ | grep "livecloud5_1.sql"`
@@ -1167,38 +1196,39 @@ string
 
     #mysql -u$sqlusername -p$sqlpassword < $lcconfig/sql_init_cmd > /dev/null
     mysql -e \
-        "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY 'security421' WITH GRANT OPTION;" > /dev/null
-    mysql -e \
         "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost' IDENTIFIED BY 'security421' WITH GRANT OPTION;" > /dev/null
     mysql -e \
         "GRANT SELECT ON livecloud.* TO 'guest'@'localhost' IDENTIFIED BY 'guest';" > /dev/null
     mysql -e \
         "FLUSH PRIVILEGES;" > /dev/null
-
-    echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
+    if [[ $? -eq 0 ]]; then
+        echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
+    else
+        echo -e '\033[60G[\033[0;31mFAILED\033[0m]'
+    fi
 
     config_stats_server $lc_release_path $controller_control_ip
-
     config_cgroups_limit_src
 
     echo -n "Configuring LLDP"
-    systemctl enable lldpad
-    systemctl restart lldpad
+    systemctl enable lldpad &>> $INSTALL_LOG
+    systemctl restart lldpad &>> $INSTALL_LOG
     for i in `ls /sys/class/net/ | grep -v lo` ;
-    	do echo "enabling lldp for interface: $i"
-    	lldptool set-lldp -i $i adminStatus=tx
-    	lldptool -T -i $i -V sysName enableTx=yes
-    	lldptool -T -i $i -V portDesc enableTx=yes
-    	lldptool -T -i $i -V sysDesc enableTx=yes
-    	lldptool -T -i $i -V sysCap enableTx=yes
-    	lldptool -T -i $i -V mngAddr enableTx=yes
-    	lldptool -T -i $i -V portID subtype=PORT_ID_INTERFACE_NAME
+    	do echo "enabling lldp for interface: $i" >> $INSTALL_LOG
+    	lldptool set-lldp -i $i adminStatus=tx &>> $INSTALL_LOG
+    	lldptool -T -i $i -V sysName enableTx=yes &>> $INSTALL_LOG
+    	lldptool -T -i $i -V portDesc enableTx=yes &>> $INSTALL_LOG
+    	lldptool -T -i $i -V sysDesc enableTx=yes &>> $INSTALL_LOG
+    	lldptool -T -i $i -V sysCap enableTx=yes &>> $INSTALL_LOG
+    	lldptool -T -i $i -V mngAddr enableTx=yes &>> $INSTALL_LOG
+    	lldptool -T -i $i -V portID subtype=PORT_ID_INTERFACE_NAME &>> $INSTALL_LOG
 	done
+	echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
     
     echo -n "Configuring rabbitmq-server ... "
     rabbitmqctl stop_app 2&> /dev/null
     rabbitmqctl reset 2&> /dev/null
-    /etc/init.d/rabbitmq-server stop 2&> /dev/null
+    systemctl stop rabbitmq-server 2&> /dev/null
     epmd -names 2> /dev/null | grep -Eo "^name \w+ at " | awk '{print $2}' | while read node_name; do
         epmd -stop $node_name
     done
@@ -1214,8 +1244,8 @@ string
 ]." > /etc/rabbitmq/rabbitmq.config
     echo -e "ERL_EPMD_PORT=20010\nNODENAME=livecloud@`hostname -s`\nNODE_IP_ADDRESS=127.0.0.1\nNODE_PORT=20001" > \
         /etc/rabbitmq/rabbitmq-env.conf
-	chkconfig rabbitmq-server on &>> $INSTALL_LOG
-    /etc/init.d/rabbitmq-server start &>> $INSTALL_LOG
+    systemctl enable rabbitmq-server &>> $INSTALL_LOG
+    systemctl restart rabbitmq-server &>> $INSTALL_LOG
     if [[ $? -eq 0 ]]; then
         echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
     else
@@ -1227,6 +1257,7 @@ string
     sed -i '/yunshanformat/d' /etc/rsyslog.conf
     sed -i '/ActionFileDefaultTemplate/i \$template yunshanformat, \"%\$NOW%|%TIMESTAMP:8:15%|%hostname%|%syslogtag%|%msg%\\n\"' /etc/rsyslog.conf
     sed -i '/ActionFileDefaultTemplate/i \$ActionFileDefaultTemplate yunshanformat' /etc/rsyslog.conf
+    systemctl enable rsyslog &>> $INSTALL_LOG
     systemctl restart rsyslog &>> $INSTALL_LOG
     echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
 
@@ -1392,7 +1423,65 @@ string
     fi
     echo -e '\033[60G[  \033[0;32mOK\033[0m  ]'
 
+    echo "set public address of lcweb ..."
+    SYSCONF="/usr/local/livecloud/conf/livecloud.conf"
+    CONFIG="/var/www/lcweb/lcc/config.ini"
+    SSL_BSS="/etc/nginx/conf.d/ssl-bss.conf"
+    SSL_OSS="/etc/nginx/conf.d/ssl-oss.conf"
+
+    sed -i "/^url =/s/url =.*/url = $public_ip_address_oss/" $CONFIG
+    sed -i "/^bss.url =/s/bss.url =.*/bss.url = $public_ip_address_bss/" $CONFIG
+    sed -i "/^bss.public_url =/s/bss.public_url =.*/bss.public_url = $public_ip_address_bss/" $CONFIG
+    
+    sed -i "s/error_page 404/rewrite \^\(\.\*\)\$  \
+https:\/\/$public_ip_address_bss\$1 permanent;\n    error_page 404/" $SSL_BSS > /dev/null
+    
+    sed -i "s/error_page 404/rewrite \^\(\.\*\)\$  \
+https:\/\/$public_ip_address_oss\$1 permanent;\n    error_page 404/" $SSL_OSS > /dev/null
+
+    sed -i "s/local_public_ip = .*/local_public_ip = $public_ip_address_oss/" $SYSCONF > /dev/null
+    sed -i "s|HOSTIP|$public_ip_address_bss|" $SSL_BSS
+    sed -i "s|HOSTIP|$public_ip_address_oss|" $SSL_OSS
+    systemctl restart nginx &>> $INSTALL_LOG
+    setenable lcrmd
+    setenable vmdriver
+    setenable lcpd
+    setenable lcmond
+    setenable lcsnfd
+    setenable postman
+    setenable talker
+    setenable storekeeper
+    setenable backup
+    setenable painter
+    setenable analyzer
+    setenable lcwebapi
+    setenable nodelistener
+    setenable httpd
+    setenable nginx
+    setenable cashier
+    setenable resourcejob
+    setenable charge
+    setdisable sdncontroller
+    setdisable idagent
+    setdisable vmwareadapter
+    setdisable keystone
+    setdisable azure
+    
     return 0
+}
+
+setenable() 
+{
+    process=$1
+    sed -i "s/$process = .*/$process = enable/" \
+    /usr/local/livecloud/conf/livecloud.conf
+}
+
+setdisable() 
+{
+    process=$1
+    sed -i "s/$process = .*/$process = disable/" \
+    /usr/local/livecloud/conf/livecloud.conf
 }
 
 __sys_install

@@ -572,14 +572,14 @@ check_environment_status()
                     grep -Eo "v[0-9]+_[0-9]+$" | sort | uniq`
                 : ${dbversion:=NULL}
                 if [[ "$expversion" = "$dbversion" ]]; then
-                    echo -e "$STATUS_OK MYSQLD:\033[20G`service mysql status`," \
+                    echo -e "$STATUS_OK MYSQLD:\033[20G`systemctl is-active mariadb`," \
                         "db version is $dbversion"
                 else
-                    echo -e "$STATUS_ERR MYSQLD:\033[20G`service mysql status`," \
+                    echo -e "$STATUS_ERR MYSQLD:\033[20G`systemctl is-active mariadb`," \
                         "db version is $dbversion, but lcweb expect $expversion"
                 fi
             elif daemon_is_enabled $charge; then
-                echo -e "$STATUS_OK MYSQLD:\033[20G`service mysql status`"
+                echo -e "$STATUS_OK MYSQLD:\033[20G`systemctl is-active mariadb`"
             fi
         fi
 
@@ -653,7 +653,7 @@ check_environment_status()
             echo -e "$STATUS_OK FORWARDING:\033[20G /proc/sys/net/ipv4/ip_forward: $ipforward_proc"
         fi
 
-        CHECK=`cat /etc/sysctl.conf|grep -e "^[ ]\{0,\}net.ipv4.ip_forward[ ]\{0,\}=[ ]\{0,\}1"`
+        CHECK=`cat /etc/sysctl.d/98-sysctl.conf|grep -e "^[ ]\{0,\}net.ipv4.ip_forward[ ]\{0,\}=[ ]\{0,\}1"`
         if [[ -z "$CHECK" ]]; then
             echo -e "$STATUS_ERR \033[20G /etc/sysctl.conf: $CHECK"
         else
@@ -668,23 +668,23 @@ check_iptables_status()
 {
     if [[ "$1" = "overview" ]]; then
         IPTABLES_FILTER_RULES=(
-            '-A INPUT -i lo -j ACCEPT'
-            '-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT'
-            '-A INPUT -p tcp -m tcp --dport 80 -j ACCEPT'
-            '-A INPUT -p tcp -m tcp --dport 443 -j ACCEPT'
-            '-A INPUT -p tcp -m tcp --dport 4369 -j ACCEPT'
-            '-A INPUT -p udp -m udp --sport 53 -j ACCEPT'
-            '-A INPUT -p udp -m multiport --dports 20000:20149 -j ACCEPT'
-            '-A INPUT -p tcp -m multiport --dports 20000:20149 -j ACCEPT'
-            '-A INPUT -p tcp -m multiport --dports 22901:23299 -j ACCEPT'
-            '-A INPUT -p tcp -m multiport --dports 10900:12899 -j ACCEPT'
-            '-A INPUT -p tcp -m multiport --dports 20900:22899 -j ACCEPT'
-            '-A INPUT -p tcp -m multiport --dports 25000:33000 -j ACCEPT'
-            '-A INPUT -p tcp -m multiport --dports 35000:43000 -j ACCEPT'
-            '-A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT'
-            '-A INPUT -p icmp -m icmp --icmp-type 0 -j ACCEPT'
-            '-A FORWARD -p tcp -m multiport --dports 25000:33000 -j ACCEPT'
-            '-A FORWARD -p tcp -m multiport --sports 25000:33000 -j ACCEPT'
+            '-A IN_public_allow -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -j ACCEPT'
+            '-A IN_public_allow -p tcp -m tcp --dport 5666 -m conntrack --ctstate NEW -j ACCEPT'
+            '-A IN_public_allow -p tcp -m tcp --dport 443 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 4369 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 623 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 10900:12899 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 123 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p udp -m udp --dport 20000:20149 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 22901:23299 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p udp -m udp --dport 161 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 20000:20149 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 53 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 20900:22899 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 25000:33000 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 43003 -m conntrack --ctstate NEW -j ACCEPT'
+			'-A IN_public_allow -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -j ACCEPT'
         )
 
         OK=1
