@@ -132,7 +132,7 @@ IPADDR=$IPADDR
 NETMASK=`masklen2netmask $MASKLEN`
 ONBOOT=yes
 string
-    which systemctl 2>&1 > /dev/null
+    which systemctl > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         hostnamectl set-hostname $HOSTNAME
         systemctl restart network
@@ -149,7 +149,7 @@ STARTMODE='onboot'
 IPADDR=$IPADDR
 NETMASK=`masklen2netmask $MASKLEN`
 string
-    which systemctl 2>&1 > /dev/null
+    which systemctl > /dev/null 2>&1
 	if [[ $? -eq 0 ]]; then
 	    hostnamectl set-hostname $HOSTNAME
         systemctl restart network
@@ -201,7 +201,7 @@ function change_ipaddr() {
 }
 
 function config_centos_vagent_respawn() {
-    which systemctl 2>&1 > /dev/null
+    which systemctl > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         cat << 'string' >/usr/lib/systemd/system/vagent.service
 [Unit]
@@ -239,7 +239,7 @@ function config_centos5_vagent_respawn() {
 }
 
 function config_debian_vagent_respawn() {
-    which systemctl 2>&1 > /dev/null
+    which systemctl > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         cat << 'string' > /lib/systemd/system/vagent.service
 [Unit]
@@ -266,7 +266,7 @@ string
 }
 
 function config_ubuntu_vagent_respawn() {
-    which systemctl 2>&1 > /dev/null
+    which systemctl > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         cat << 'string' > /lib/systemd/system/vagent.service
 [Unit]
@@ -298,7 +298,7 @@ string
 }
 
 function config_suse_vagent_respawn() {
-    which systemctl 2>&1 > /dev/null
+    which systemctl > /dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         cat << 'string' >/usr/lib/systemd/system/vagent.service
 [Unit]
